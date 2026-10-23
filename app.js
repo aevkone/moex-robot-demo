@@ -30,7 +30,13 @@ themeBtn.onclick = () => {
 };
 
 // ---------- общие куски ----------
-const kpi = (v, l, tone = '') => `<div class="card kpi ${tone}"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+const kpi = (v, l, tone = '') => `<div class="${tone}"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+const stats = (...items) => `<div class="stats" style="--n:${items.length}">${items.join('')}</div>`;
+const ICON_OK = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_NO = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+const verdict = (ok, title, note) => `<div class="card verdict ${ok ? '' : 'no'}" role="note"><span class="ico">${ok ? ICON_OK : ICON_NO}</span><b>${title}</b><div class="note">${note}</div></div>`;
+// ширина графика = ширина контента, чтобы подписи оставались читаемыми и на телефоне
+const cw = () => Math.round(Math.min(1100, Math.max(340, main.clientWidth - 48)));
 const table = (head, rows, { hl = -1 } = {}) => `<div class="tablewrap"><table><thead><tr>${head.map((h) => `<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map((r, i) => `<tr${i === hl ? ' class="hl"' : ''}>${r.map((c) => (typeof c === 'object' && c ? `<td class="${c.cls ?? ''}">${c.v}</td>` : `<td>${c}</td>`)).join('')}</tr>`).join('')}</tbody></table></div>`;
 const vlabel = (k) => `<span class="dot" style="background:var(--${k})"></span>${k}. ${SHORT[k]}`;
 
@@ -44,18 +50,15 @@ function viewOverview() {
   return `
   <h1>${rec.go ? `Идём в разработку с вариантом ${rec.key}` : 'Ни один вариант пока не готов к разработке'}</h1>
   <p class="sub">Четыре варианта настройки робота проверены на истории Мосбиржи ${fmtDate(R.meta.from)} — ${fmtDate(R.meta.to)} при тарифе 0,03% и капитале 500 тыс. ₽. Настройки выбирались по 2020–2022 годам, 2023–2026 — независимая проверка.</p>
-  <div class="card verdict ${rec.go ? '' : 'no'}">
-    <span class="badge ${rec.go ? 'good' : 'bad'}">${rec.go ? 'Обгоняет фонд' : 'Не обгоняет фонд'}</span>
-    <div><b>${esc(best.title)}</b><div class="note">${esc(rec.reason)}</div></div>
-  </div>
-  <div class="grid g4" style="margin-top:14px">
-    ${kpi(`${n(best.full.cagr)}%`, `годовых у варианта ${best.key} после всех издержек`, 'good')}
-    ${kpi(`${n(B.cagr)}%`, 'годовых у фонда денежного рынка')}
-    ${kpi(`${pp(best.outSample.excessCagr)} п.п.`, 'сверх фонда на проверке 2023–2026', best.outSample.excessCagr > 0 ? 'good' : 'bad')}
-    ${kpi(`${n(best.full.maxDD)}%`, 'максимальная просадка')}
+  ${verdict(rec.go, esc(best.title), esc(rec.reason))}
+  <div style="margin-top:14px">${stats(
+    kpi(`${n(best.full.cagr)}%`, `годовых у варианта ${best.key} после всех издержек`, 'good'),
+    kpi(`${n(B.cagr)}%`, 'годовых у фонда денежного рынка'),
+    kpi(`${pp(best.outSample.excessCagr)} п.п.`, 'сверх фонда на проверке 2023–2026', best.outSample.excessCagr > 0 ? 'good' : 'bad'),
+    kpi(`${n(best.full.maxDD)}%`, 'максимальная просадка'))}
   </div>
   <h2>Капитал по вариантам</h2>
-  <div class="card chart">${equityChart(lines, { width: 1100, height: 420, c: C, log: true, title: 'тыс. ₽, логарифмическая шкала, после всех издержек' })}</div>
+  <div class="card chart">${equityChart(lines, { width: cw(), height: cw() < 640 ? 300 : 420, c: C, log: true, title: 'тыс. ₽, логарифмическая шкала, после всех издержек' })}</div>
   <h2>Сравнение</h2>
   ${table(['Вариант', 'Доходность, % год.', 'Сверх фонда, п.п.', 'Просадка, %', 'Шарп', 'Сделок', 'Издержки, % год.', 'Сверх фонда 2023–26'],
     [...Object.values(V).map((v) => [vlabel(v.key), n(v.full.cagr), { v: pp(v.full.excessCagr), cls: cls(v.full.excessCagr) }, n(v.full.maxDD), n(v.full.sharpe, 2), rub(v.full.trades), n(-costSum(v.full.costsPctYear)), { v: pp(v.outSample.excessCagr), cls: cls(v.outSample.excessCagr) }]),
@@ -97,18 +100,15 @@ function viewVariants(key) {
   <h1>Варианты робота</h1>
   <p class="sub">Подробности по каждому варианту: доходность по годам, выбор настроек на обучающем периоде, стресс 2022 года и вклад стратегий.</p>
   <div class="tabs" role="group" aria-label="Вариант">${Object.keys(V).map((x) => `<button type="button" data-variant="${x}" aria-pressed="${x === k}">${x}. ${SHORT[x]}</button>`).join('')}</div>
-  <div class="card verdict ${v.full.excessCagr > 0 && v.outSample.excessCagr > 0 ? '' : 'no'}">
-    <span class="badge ${v.full.excessCagr > 0 && v.outSample.excessCagr > 0 ? 'good' : 'bad'}">${v.full.excessCagr > 0 && v.outSample.excessCagr > 0 ? 'Обгоняет фонд' : 'Проигрывает фонду'}</span>
-    <div><b>${esc(v.title)}</b><div class="note">Выбранные настройки: риск ×${v.selected.riskMult}, ${v.selected.filter ? 'с ИИ-фильтром' : 'без ИИ-фильтра'}.</div></div>
-  </div>
-  <div class="grid g4" style="margin-top:14px">
-    ${kpi(`${n(v.full.cagr)}%`, 'годовых за весь период', v.full.excessCagr > 0 ? 'good' : 'bad')}
-    ${kpi(`${pp(v.full.excessCagr)} п.п.`, 'сверх фонда', v.full.excessCagr > 0 ? 'good' : 'bad')}
-    ${kpi(`${n(v.full.maxDD)}%`, 'максимальная просадка')}
-    ${kpi(rub(v.full.trades), `сделок, ${n(v.full.turnoverPerYear, 0)} капиталов оборота в год`)}
+  ${verdict(v.full.excessCagr > 0 && v.outSample.excessCagr > 0, `${esc(v.title)} — ${v.full.excessCagr > 0 && v.outSample.excessCagr > 0 ? 'обгоняет фонд' : 'проигрывает фонду'}`, `Выбранные настройки: риск ×${v.selected.riskMult}, ${v.selected.filter ? 'с ИИ-фильтром' : 'без ИИ-фильтра'}. На проверке 2023–2026: ${pp(v.outSample.excessCagr)} п.п. к фонду.`)}
+  <div style="margin-top:14px">${stats(
+    kpi(`${n(v.full.cagr)}%`, 'годовых за весь период', v.full.excessCagr > 0 ? 'good' : 'bad'),
+    kpi(`${pp(v.full.excessCagr)} п.п.`, 'сверх фонда', v.full.excessCagr > 0 ? 'good' : 'bad'),
+    kpi(`${n(v.full.maxDD)}%`, 'максимальная просадка'),
+    kpi(rub(v.full.trades), `сделок, ${n(v.full.turnoverPerYear, 0)} капиталов оборота в год`))}
   </div>
   <h2>По годам</h2>
-  <div class="card chart">${yearChart([{ label: `${k}. ${SHORT[k]}`, color: C[k], values: val(v.full.years) }, { label: 'Фонд ДР', color: C.fund, values: val(R.benchmark.years) }], years, { width: 1100, height: 320, c: C })}</div>
+  <div class="card chart">${yearChart([{ label: `${k}. ${SHORT[k]}`, color: C[k], values: val(v.full.years) }, { label: 'Фонд ДР', color: C.fund, values: val(R.benchmark.years) }], years, { width: cw(), height: 300, c: C })}</div>
   <div class="grid g2" style="margin-top:18px">
     <div><h2 style="margin-top:0">Издержки и доходы, % в год</h2>
       ${table(['Статья', '% среднего капитала'], [
@@ -126,11 +126,10 @@ function viewVariants(key) {
     v.grid.map((g) => [`×${g.riskMult}, ${g.filter ? 'с фильтром' : 'без фильтра'}${g.riskMult === v.selected.riskMult && g.filter === v.selected.filter ? ' <span class="badge good">выбрано</span>' : ''}`, { v: pp(g.is.excessCagr), cls: cls(g.is.excessCagr) }, n(g.is.maxDD), { v: pp(g.oos.excessCagr), cls: cls(g.oos.excessCagr) }, n(g.oos.maxDD)]),
     { hl: v.grid.findIndex((g) => g.riskMult === v.selected.riskMult && g.filter === v.selected.filter) })}
   <h2>Стресс 2022 года</h2>
-  <div class="grid g3">
-    ${kpi(`${pp(v.stress2022.totalReturn)}%`, '2022 год целиком', v.stress2022.totalReturn > 0 ? 'good' : 'bad')}
-    ${kpi(`${pp(v.stressFebMar2022.totalReturn)}%`, 'февраль–апрель 2022', v.stressFebMar2022.totalReturn > 0 ? 'good' : 'bad')}
-    ${kpi(`${n(v.stress2022.maxDD)}%`, 'просадка в 2022')}
-  </div>
+  ${stats(
+    kpi(`${pp(v.stress2022.totalReturn)}%`, '2022 год целиком', v.stress2022.totalReturn > 0 ? 'good' : 'bad'),
+    kpi(`${pp(v.stressFebMar2022.totalReturn)}%`, 'февраль–апрель 2022', v.stressFebMar2022.totalReturn > 0 ? 'good' : 'bad'),
+    kpi(`${n(v.stress2022.maxDD)}%`, 'просадка в 2022'))}
   <h2>Последние сделки</h2>
   ${table(['Стратегия', 'Инструмент', 'Сторона', 'Вход', 'Выход', 'Причина', 'Результат, ₽'], v.lastTrades.slice().reverse().slice(0, 15).map((t) => [STRAT[t.strat] ?? t.strat, t.sym, t.side > 0 ? 'покупка' : 'продажа', fmtDate(t.entryT), fmtDate(t.exitT), t.reason, { v: rub(t.pnl - t.costs), cls: cls(t.pnl - t.costs) }]))}`;
 }
@@ -157,7 +156,7 @@ function viewCalc() {
   <p class="sub">Сколько счёт получает или теряет за год, если стратегия сама по себе заработала ровно ноль, — и какую доходность ей нужно показать, чтобы обогнать простой фонд денежного рынка.</p>
   <div class="split">
     <div class="card form" id="calcForm">
-      <div class="tabs" role="group" aria-label="Пресет"><button type="button" data-preset="original">Как планировалось</button><button type="button" data-preset="recommended">С рекомендациями</button></div>
+      <div class="tabs" role="group" aria-label="Пресет"><button type="button" data-preset="original" aria-pressed="false">Как планировалось</button><button type="button" data-preset="recommended" aria-pressed="true">С рекомендациями</button></div>
       ${CALC_FIELDS.map(([id, label, min, max, step]) => `<div class="field"><label for="c-${id}">${label} <b id="o-${id}"></b></label><input id="c-${id}" type="range" min="${min}" max="${max}" step="${step}" value="${calc[id]}"></div>`).join('')}
       <div class="checks"><label><input type="checkbox" id="c-inFund" ${calc.inFund ? 'checked' : ''}> Свободные деньги в фонде ДР</label></div>
     </div>
@@ -171,12 +170,11 @@ function renderCalc() {
   const z = zeroStrategy(mode, p);
   const orig = zeroStrategy('original', { ...p, mode: {} });
   $('#calcOut').innerHTML = `
-    <div class="grid g3">
-      ${kpi(`${pp(z.total)}%`, 'счёт за год при нулевой стратегии', z.total >= 0 ? 'good' : 'bad')}
-      ${kpi(`${n(z.hurdle)}%`, 'нужно заработать стратегии, чтобы обогнать фонд', z.hurdle <= 10 ? 'good' : 'bad')}
-      ${kpi(`${n(z.fundOnly)}%`, 'всё просто в фонде, без робота')}
-    </div>
-    <div class="card chart" style="margin-top:14px">${zeroChart({ original: orig, recommended: { ...z, fundOnly: calc.fundYield } }, { width: 1000, c: C })}</div>
+    ${stats(
+      kpi(`${pp(z.total)}%`, 'счёт за год при нулевой стратегии', z.total >= 0 ? 'good' : 'bad'),
+      kpi(`${n(z.hurdle)}%`, 'нужно заработать стратегии, чтобы обогнать фонд', z.hurdle <= 10 ? 'good' : 'bad'),
+      kpi(`${n(z.fundOnly)}%`, 'всё просто в фонде, без робота'))}
+    <div class="card chart" style="margin:14px 0">${zeroChart({ original: orig, recommended: { ...z, fundOnly: calc.fundYield } }, { width: 1000, c: C })}</div>
     ${table(['Статья, % капитала в год', 'Ваша настройка', 'Изначальный план'], [
       ['Комиссии', { v: pp(z.commission), cls: cls(z.commission) }, pp(orig.commission)],
       ['Проскальзывание', { v: pp(z.slippage), cls: cls(z.slippage) }, pp(orig.slippage)],
@@ -190,12 +188,14 @@ function renderCalc() {
 function bindCalc() {
   const form = $('#calcForm');
   form.addEventListener('input', (e) => {
+    form.querySelectorAll('[data-preset]').forEach((x) => x.setAttribute('aria-pressed', 'false'));
     const id = e.target.id.replace('c-', '');
     calc[id] = e.target.type === 'checkbox' ? e.target.checked : +e.target.value;
     renderCalc();
   });
   form.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => {
     calc = calcPreset(b.dataset.preset);
+    form.querySelectorAll('[data-preset]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     for (const [id] of CALC_FIELDS) $(`#c-${id}`).value = calc[id];
     $('#c-inFund').checked = calc.inFund;
     renderCalc();
@@ -254,21 +254,21 @@ function bindLab() {
 function runLab() {
   if (!lab.strategies.length) { $('#labStatus').textContent = 'Выберите хотя бы одну стратегию.'; return; }
   worker ??= new Worker('./lab-worker.js', { type: 'module' });
-  const btn = $('#labRun'); btn.disabled = true;
+  const btn = $('#labRun'); btn.disabled = true; btn.textContent = 'Считаю…';
+  $('#labOut').innerHTML = '<div class="skeleton" style="height:86px"></div><div class="skeleton" style="height:340px;margin-top:14px"></div>';
   worker.onmessage = ({ data }) => {
     if (data.type === 'progress') { const s = $('#labStatus'); if (s) s.textContent = data.text; return; }
-    const b = $('#labRun'); if (b) b.disabled = false;
-    if (data.type === 'error') { $('#labStatus').textContent = `Ошибка: ${data.text}`; return; }
+    const b = $('#labRun'); if (b) { b.disabled = false; b.textContent = 'Рассчитать'; }
+    if (data.type === 'error') { $('#labStatus').textContent = `Не получилось посчитать: ${data.text}. Попробуйте другой период или набор стратегий.`; $('#labOut').innerHTML = ''; return; }
     $('#labStatus').textContent = `Готово за ${n(data.ms / 1000, 1)} с.`;
     const s = data.summary, c = s.costsPctYear;
     $('#labOut').innerHTML = `
-      <div class="grid g4">
-        ${kpi(`${n(s.cagr)}%`, 'годовых после издержек', s.excessCagr > 0 ? 'good' : 'bad')}
-        ${kpi(`${pp(s.excessCagr)} п.п.`, `сверх фонда (${n(data.bench.cagr)}%)`, s.excessCagr > 0 ? 'good' : 'bad')}
-        ${kpi(`${n(s.maxDD)}%`, 'максимальная просадка')}
-        ${kpi(rub(s.trades ?? 0), 'сделок')}
-      </div>
-      <div class="card chart" style="margin-top:14px">${equityChart([{ label: 'Ваша настройка', color: C.D, points: data.equity, width: 2.5 }, { label: 'Фонд ДР', color: C.fund, points: data.benchEquity, dash: '6 4' }], { width: 1000, height: 360, c: C })}</div>
+      ${stats(
+        kpi(`${n(s.cagr)}%`, 'годовых после издержек', s.excessCagr > 0 ? 'good' : 'bad'),
+        kpi(`${pp(s.excessCagr)} п.п.`, `сверх фонда (${n(data.bench.cagr)}%)`, s.excessCagr > 0 ? 'good' : 'bad'),
+        kpi(`${n(s.maxDD)}%`, 'максимальная просадка'),
+        kpi(rub(s.trades ?? 0), 'сделок'))}
+      <div class="card chart" style="margin-top:14px">${equityChart([{ label: 'Ваша настройка', color: C.D, points: data.equity, width: 2.5 }, { label: 'Фонд ДР', color: C.fund, points: data.benchEquity, dash: '6 4' }], { width: Math.max(360, $('#labOut').clientWidth - 40), height: 340, c: C })}</div>
       <div class="grid g2" style="margin-top:14px">
         ${table(['Статья', '% в год'], [['Комиссии', n(c.commission, 2)], ['Проскальзывание', n(c.slippage, 2)], ['Перекладка', n(c.roll, 2)], ['Обслуживание', n(c.premium, 2)], ['Доход фонда', pp(c.mmf, 2)], ['Дивиденды', pp(c.dividends, 2)], ['Шарп', n(s.sharpe, 2)]])}
         ${table(['Стратегия', 'Сделок', 'Итог, ₽'], data.byStrategy.map((x) => [STRAT[x.strat] ?? x.strat, rub(x.trades), { v: rub(x.pnl - x.costs), cls: cls(x.pnl - x.costs) }]))}
@@ -283,20 +283,19 @@ function runLab() {
 let robotTimer = null;
 async function viewRobot() {
   const r = await loadRobot();
-  if (r.empty) return `<h1>Робот</h1><div class="card empty">Робот ещё не запускался. Запустите <span class="mono">node robot/main.js plan</span>.</div>`;
+  if (r.empty) return `<h1>Робот</h1><div class="card empty"><p><b>Робот ещё не запускался.</b></p><p>Посчитайте первый план командой <span class="mono">node robot/main.js plan</span>, затем выставьте заявки: <span class="mono">node robot/main.js execute</span>. По умолчанию это бумажная торговля — реальные деньги не участвуют.</p></div>`;
   const acc = r.account;
   const modeName = { paper: 'Бумажная торговля', sandbox: 'Песочница T-Invest', live: 'Реальный счёт' }[r.mode] ?? r.mode;
   const plan = r.plan;
   const start = 500000;
   return `
-  <h1>Робот</h1>
+  <div class="pagehead"><h1>Робот</h1><span class="badge ${r.mode === 'live' ? 'bad' : r.mode === 'sandbox' ? 'warn' : 'good'}">${modeName}</span></div>
   <p class="sub">${r.live ? 'Состояние обновляется с локального сервера раз в 30 секунд.' : `Демо-снимок состояния на ${fmtDate(r.at)} — на сервере робота здесь живые данные.`} Управление — командами <span class="mono">node robot/main.js plan | execute | monitor | stop | resume</span>.</p>
-  <div class="grid g4">
-    ${kpi(modeName, 'режим', r.mode === 'live' ? 'bad' : '')}
-    ${kpi(acc ? `${rub(acc.equity)} ₽` : '—', acc ? `оценка счёта, ${pp((acc.equity / start - 1) * 100, 2)}% с начала` : 'счёт T-Invest')}
-    ${kpi(r.killSwitch ? 'Остановлен' : r.state?.halted ? 'Пауза до завтра' : 'Работает', r.killSwitch ? 'аварийная остановка включена' : r.state?.halted ? 'сработал дневной лимит убытка' : 'аварийная остановка выключена', r.killSwitch || r.state?.halted ? 'bad' : 'good')}
-    ${kpi(plan ? fmtDate(plan.asOf) : '—', 'дата последнего плана')}
-  </div>
+  ${stats(
+    kpi(acc ? `${rub(acc.equity)} ₽` : '—', acc ? `оценка счёта, ${pp((acc.equity / start - 1) * 100, 2)}% с начала` : 'счёт T-Invest'),
+    kpi(r.killSwitch ? 'Остановлен' : r.state?.halted ? 'Пауза до завтра' : 'Работает', r.killSwitch ? 'аварийная остановка включена' : r.state?.halted ? 'сработал дневной лимит убытка' : 'аварийная остановка выключена', r.killSwitch || r.state?.halted ? 'bad' : 'good'),
+    kpi(plan ? fmtDate(plan.asOf) : '—', 'дата последнего плана'),
+    kpi(String(r.stops?.reduce((a, x) => a + x.legs.filter((l) => !l.done).length, 0) ?? 0), 'активных стопов'))}
   ${r.mode === 'live' ? '<p class="callout" style="margin-top:14px">Робот торгует на реальном счёте. Аварийная остановка: <span class="mono">node robot/main.js stop</span> — закрывает позиции робота и запрещает новые заявки.</p>' : ''}
   <h2>Позиции</h2>
   ${acc?.positions?.length ? table(['Инструмент', 'Режим', 'Количество', 'Средняя цена', 'Текущая цена', 'Стоимость, ₽'], acc.positions.map((p) => [p.ticker, p.classCode === 'SPBFUT' ? 'фьючерс' : p.ticker === 'LQDT' ? 'фонд ДР' : 'акция', rub(p.qty), n(p.avg, p.avg < 10 ? 4 : 2), n(p.price, p.price < 10 ? 4 : 2), p.classCode === 'SPBFUT' ? '—' : rub(p.qty * p.price)])) : '<div class="card empty">Позиций нет.</div>'}
@@ -345,6 +344,7 @@ async function route() {
   document.querySelectorAll('.nav a').forEach((a) => { if (a.dataset.r === page) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   const views = { overview: viewOverview, variants: () => viewVariants(arg), calc: viewCalc, lab: viewLab, robot: viewRobot, method: viewMethod };
   const view = views[page] ?? viewOverview;
+  if (page === 'robot') main.innerHTML = '<h1>Робот</h1><div class="skeleton" style="height:90px"></div><div class="skeleton" style="height:260px;margin-top:14px"></div>';
   main.innerHTML = await view();
   document.title = `${$('h1')?.textContent ?? 'Панель'} — Робот Мосбиржи`;
   if (page === 'variants') main.querySelectorAll('[data-variant]').forEach((b) => b.addEventListener('click', () => { location.hash = `#/variants/${b.dataset.variant}`; }));
@@ -357,6 +357,7 @@ async function route() {
 
 try {
   R = await loadJSON('data/results.json');
+  $('#dataMeta').textContent = `Данные Мосбиржи ${fmtDate(R.meta.from)} — ${fmtDate(R.meta.to)}, расчёт от ${fmtDate(R.meta.generated)}.`;
   window.addEventListener('hashchange', route);
   route();
 } catch (e) {

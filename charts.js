@@ -22,7 +22,8 @@ function niceTicks(min, max, n = 5) {
 
 // Кривые капитала: lines = [{ label, color, points: [[date, value]], dash }]; значения в тыс. ₽.
 export function equityChart(lines, { width = 900, height = 380, title = '', c = PALETTE, log = false, font = 'system-ui, sans-serif' } = {}) {
-  const pad = { l: 64, r: 200, t: title ? 36 : 14, b: 34 };
+  const narrow = width < 640;
+  const pad = { l: narrow ? 44 : 64, r: narrow ? 118 : 200, t: title ? 36 : 14, b: 34 };
   const all = lines.flatMap((l) => l.points);
   const t0 = Date.parse(all.reduce((a, p) => (p[0] < a ? p[0] : a), all[0][0]));
   const t1 = Date.parse(all.reduce((a, p) => (p[0] > a ? p[0] : a), all[0][0]));
@@ -36,7 +37,7 @@ export function equityChart(lines, { width = 900, height = 380, title = '', c = 
     : niceTicks(vmin / 1000, vmax / 1000, 5);
   let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="${font}" role="img" aria-label="${esc(title || 'График капитала')}">`;
   s += `<rect width="${width}" height="${height}" fill="${c.bg}"/>`;
-  if (title) s += `<text x="${pad.l}" y="20" font-size="14" fill="${c.muted}">${esc(title)}</text>`;
+  if (title && !narrow) s += `<text x="${pad.l}" y="20" font-size="14" fill="${c.muted}">${esc(title)}</text>`;
   for (const v of ticks) {
     const y = Y(v * 1000);
     s += `<line x1="${pad.l}" x2="${width - pad.r}" y1="${y}" y2="${y}" stroke="${c.grid}"/>`;
@@ -44,10 +45,11 @@ export function equityChart(lines, { width = 900, height = 380, title = '', c = 
   }
   for (let y = new Date(t0).getUTCFullYear() + 1; y <= new Date(t1).getUTCFullYear(); y++) {
     const x = X(`${y}-01-01`);
+    if (narrow && y % 2) continue;
     s += `<line x1="${x}" x2="${x}" y1="${pad.t}" y2="${height - pad.b}" stroke="${c.grid}" stroke-dasharray="2 3"/>`;
     s += `<text x="${x}" y="${height - pad.b + 18}" font-size="12" text-anchor="middle" fill="${c.muted}">${y}</text>`;
   }
-  s += `<text x="${pad.l - 52}" y="${pad.t + 4}" font-size="11" fill="${c.muted}">тыс. ₽</text>`;
+  if (!narrow) s += `<text x="${pad.l - 52}" y="${pad.t + 4}" font-size="11" fill="${c.muted}">тыс. ₽</text>`;
   const ends = [];
   for (const l of lines) {
     const d = l.points.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('');
@@ -59,7 +61,7 @@ export function equityChart(lines, { width = 900, height = 380, title = '', c = 
   ends.sort((a, b) => a.y - b.y);
   for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 30) ends[i].y = ends[i - 1].y + 30;
   for (const e of ends) {
-    s += `<text x="${width - pad.r + 8}" y="${e.y}" font-size="12" font-weight="600" fill="${e.l.color}">${esc(e.l.label)}</text>`;
+    s += `<text x="${width - pad.r + 8}" y="${e.y}" font-size="12" font-weight="600" fill="${e.l.color}">${esc(narrow ? e.l.label.split('.')[0] + (e.l.label.includes('.') ? '' : '') : e.l.label)}</text>`;
     s += `<text x="${width - pad.r + 8}" y="${e.y + 14}" font-size="11" fill="${c.muted}">${Math.round(e.v / 1000).toLocaleString('ru-RU')} тыс. ₽</text>`;
   }
   return s + '</svg>';
