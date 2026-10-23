@@ -34,6 +34,21 @@ export function curveStats(equity, capital) {
   };
 }
 
+// Дневные доходности сверх фонда: Шарп превышения (годовой) и t-статистика среднего превышения.
+export function excessStats(equity, benchEquity) {
+  const bm = new Map(benchEquity.map((p) => [p.d, p.eq]));
+  const xs = [];
+  for (let i = 1; i < equity.length; i++) {
+    const a = bm.get(equity[i].d), b = bm.get(equity[i - 1].d);
+    if (a == null || b == null) continue;
+    xs.push(equity[i].eq / equity[i - 1].eq - a / b);
+  }
+  if (xs.length < 20) return { sharpeExcess: null, tStat: null };
+  const m = xs.reduce((x, y) => x + y, 0) / xs.length;
+  const sd = Math.sqrt(xs.reduce((x, y) => x + (y - m) ** 2, 0) / (xs.length - 1));
+  return { sharpeExcess: sd > 0 ? (m / sd) * Math.sqrt(252) : null, tStat: sd > 0 ? (m / sd) * Math.sqrt(xs.length) : null };
+}
+
 export function byYear(equity, capital) {
   const out = [];
   let prev = capital;
@@ -87,6 +102,9 @@ export function summarize(res, benchmark) {
     out.benchmarkCagr = b.cagr;
     out.excessCagr = s.cagr - b.cagr;
     out.beatsFund = s.cagr > b.cagr;
+    Object.assign(out, excessStats(res.equity, benchmark.equity));
+    const by = new Map(byYear(benchmark.equity, benchmark.capital).map((y) => [y.year, y.ret]));
+    out.yearsLost = out.years.filter((y) => by.has(y.year) && y.ret < by.get(y.year)).map((y) => ({ year: y.year, ret: y.ret, fund: by.get(y.year) }));
   }
   return out;
 }

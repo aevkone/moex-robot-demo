@@ -67,7 +67,7 @@ export function forecast(excess, { fundYield = 12, n = 5000, block = 3, seed = 4
   for (let k = 0; k < n; k++) {
     let v = 1, f = 1;
     for (let mth = 0; mth < 12; ) {
-      const st = Math.floor(rnd() * (xs.length - block));
+      const st = Math.floor(rnd() * (xs.length - block + 1)); // любой блок, включая последний
       for (let j = 0; j < block && mth < 12; j++, mth++) { v *= 1 + fundM + xs[st + j]; f *= 1 + fundM; }
     }
     sims.push({ ret: (v - 1) * 100, excess: (v - f) * 100 });
@@ -100,7 +100,7 @@ export function sensitivity(ds, key, setting, onProgress) {
 }
 
 export const pickStats = (s) => s && ({
-  cagr: s.cagr, totalReturn: s.totalReturn, maxDD: s.maxDD, sharpe: s.sharpe, vol: s.vol, trades: s.trades, winRate: s.winRate,
+  cagr: s.cagr, totalReturn: s.totalReturn, maxDD: s.maxDD, sharpeExcess: s.sharpeExcess, tStat: s.tStat, yearsLost: s.yearsLost, avgNet: s.avgNet, sharpe: s.sharpe, vol: s.vol, trades: s.trades, winRate: s.winRate,
   excessCagr: s.excessCagr, benchmarkCagr: s.benchmarkCagr, beatsFund: s.beatsFund,
   turnoverPerYear: s.turnoverPerYear, costsPctYear: s.costsPctYear, years: s.years,
   endEquity: s.endEquity, from: s.from, to: s.to, profitFactor: s.profitFactor, longestDDdays: s.longestDDdays,

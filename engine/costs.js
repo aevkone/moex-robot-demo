@@ -11,6 +11,8 @@ export const DEFAULTS = {
   haircut: 0.9,            // коэффициент принятия паёв в залог
   slipMult: 1,             // множитель проскальзывания (стресс-сценарий ×2)
   limitFillMissBp: 1,      // лимитная заявка исполняется, только если цена прошла лимит на ≥ 1 б.п.
+  futExchangeFee: 0.00002, // биржевой сбор по фьючерсам сверх комиссии брокера, с каждой стороны (допущение)
+  fundSpreadBp: 0.5,       // спред при ежедневной перекладке денег в паи фонда, б.п. от суммы
   rateShift: 0,            // сдвиг ставки денежного рынка, п.п. (сценарий снижения ключевой ставки)
 };
 
@@ -54,7 +56,7 @@ export function slippage(instr, { orderType = 'market', notional = 0, barValue =
 }
 
 export function commissionRate(instr, o = DEFAULTS) {
-  return instr.kind === 'fut' ? o.futCommission : o.commission;
+  return instr.kind === 'fut' ? o.futCommission + (o.futExchangeFee ?? 0) : o.commission;
 }
 
 // Дневная доходность фонда ДР по ставке RUSFAR (% годовых) — начисляется по календарным дням.

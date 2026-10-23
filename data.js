@@ -21,7 +21,7 @@ export function decodeDaily(d) {
     series, meta: d.meta,
     RUSFAR: d.RUSFAR.map(([dd, r]) => ({ d: dd, r })),
     IMOEX: d.IMOEX.map(([dd, c]) => ({ d: dd, c })),
-    MCFTRR: d.MCFTRR.map(([dd, c]) => ({ d: dd, c })),
+    MCFTR: (d.MCFTR ?? d.MCFTRR).map(([dd, c]) => ({ d: dd, c })),
   };
 }
 

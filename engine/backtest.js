@@ -57,6 +57,8 @@ export function runBacktest(cfg) {
     const raw = b.raw ?? b.c;
     return ins.notional(raw, usdOn(st.date)) / raw;
   };
+  // цена реального контракта для уровня px склеенного ряда (поправка склейки = c − raw бара)
+  const realPrice = (px, b) => { const r = px - (b.c - (b.raw ?? b.c)); return r > 0 ? r : Math.abs(b.raw ?? b.c); };
   const contractValue = (sym, b) => instr(sym).kind === 'fut' ? instr(sym).notional(b.raw ?? b.c, usdOn(st.date)) : b.c;
   const marginPer = (sym, b) => {
     const ins = instr(sym);
@@ -82,8 +84,9 @@ export function runBacktest(cfg) {
     if (!dq) return;
     const ins = instr(sym);
     const slip = slippage(ins, { orderType: type, notional: Math.abs(dq) * contractValue(sym, b), barValue: (b.v || 0) * contractValue(sym, b), slipMult: o.slipMult });
-    const execPx = px * (1 + Math.sign(dq) * slip);
-    const value = Math.abs(dq) * contractValue(sym, b) * (execPx / px);
+    // проскальзывание — доля фактической цены контракта, а не склеенной (у склеенного ряда цена может быть даже < 0)
+    const execPx = px + Math.sign(dq) * slip * realPrice(px, b);
+    const value = Math.abs(dq) * contractValue(sym, b);
     const comm = value * commissionRate(ins, o);
     const slipCost = Math.abs(dq) * Math.abs(execPx - px) * rubPerPoint(sym, b);
     st.cash -= comm;
@@ -133,7 +136,7 @@ export function runBacktest(cfg) {
       if (o.premiumFeeMonth && d.slice(0, 7) !== st.date.slice(0, 7)) { st.cash -= o.premiumFeeMonth; st.costs.premium += o.premiumFeeMonth; }
     }
     if (moneyMap.has(d)) lastRate = moneyMap.get(d);
-    // дивиденды по длинным позициям в акциях: дивидендная доходность рынка за день (MCFTRR/IMOEX), минус НДФЛ 13%
+    // дивиденды по длинным позициям в акциях: дивидендная доходность рынка за день (MCFTR брутто / IMOEX), минус НДФЛ 13%
     const dy = divs.get?.(d) ?? 0;
     if (dy > 0) {
       for (const [k, p] of Object.entries(st.pos)) {
@@ -148,7 +151,9 @@ export function runBacktest(cfg) {
       const eq = equityNow();
       const target = Math.max(0, eq - sharesValue() - eq * o.reserve);
       const move = target - st.fund;
-      st.fund += move; st.cash -= move;
+      // покупка/продажа паёв без комиссии брокера, но через спред стакана
+      const spread = Math.abs(move) * (o.fundSpreadBp ?? 0) / 1e4;
+      st.fund += move; st.cash -= move + spread; st.costs.slippage += spread;
     }
     st.turnoverToday = 0;
     st.dayStartEq = equityNow();
@@ -209,7 +214,7 @@ export function runBacktest(cfg) {
     let px;
     if (atClose) px = b.c;
     else if (ord.type === 'limit') {
-      const miss = ord.limit * o.limitFillMissBp / 1e4;
+      const miss = realPrice(ord.limit, b) * o.limitFillMissBp / 1e4;
       const ok = dq > 0 ? b.l < ord.limit - miss : b.h > ord.limit + miss;
       if (!ok) return false;
       px = dq > 0 ? Math.min(ord.limit, b.o) : Math.max(ord.limit, b.o);
